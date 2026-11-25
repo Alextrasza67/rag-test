@@ -77,9 +77,43 @@ docker exec rag-test-pg psql -U rag -d ragdb -c \
 
 ## 添加数据
 
-1. 把 `.md` / `.txt` / `.pdf` 文件放进 `data/`（支持子目录）
-2. `uv run python -m app.ingest` 增量入库；`--reset` 先清空再全量重建
-3. 注意：增量模式重复跑同一文件会产生重复片段；改完文档用 `--reset` 最省心
+```bash
+uv run python -m app.ingest [文件或目录...]   # 不带参数默认入库 data/ 全部
+```
+
+- 支持同时指定多个文件/目录，类型：`.md` / `.txt` / `.pdf`
+- **SHA-256 去重**：内容未变化且已生效的文件自动跳过
+- **同名冲突**（文件内容变化时）三选一：
+  - `[c]` 覆盖：清除该文件全部历史版本，新内容作为 v1
+  - `[n]` 新版本：历史版本向量保留但失活，新内容作为 vN+1 并生效
+  - `[s]` 跳过
+  - 可用 `-o` / `-n` 参数跳过询问；非交互环境默认跳过
+- `--reset`：清空向量表与注册表后全量重建
+
+### 版本管理
+
+```bash
+uv run python -m app.docs list                 # 全部文档与版本状态
+uv run python -m app.docs history sample.md    # 单个文件的历史
+uv run python -m app.docs use sample.md 1      # 切换生效版本
+uv run python -m app.docs rm sample.md         # 删除文件(全部版本)
+uv run python -m app.docs rm sample.md --version 1 -y   # 只删某版本
+```
+
+- 每个文档可以有多个版本，**同一时刻只有一个版本生效**
+- 检索只返回「生效版本」的片段；切换版本即时生效，无需重建索引
+- 历史版本向量保留在库中，可随时切回；引用会显示来源文件与版本（如 `faq.md v1`）
+
+### 数据血缘（doc_registry）
+
+向量片段通过元数据 `doc_id/version/active` 关联两张注册表：
+
+- `doc_registry`：逻辑文档（rel_path 唯一）
+- `doc_version`：物理版本（sha256、片段数、是否生效、入库时间）
+
+删除版本/文件、覆盖、去重判断都以注册表为准，保证向量与登记一致。
+
+
 
 ## 常见问题
 

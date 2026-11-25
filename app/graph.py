@@ -36,9 +36,9 @@ def _format_docs(docs: list[Document]) -> str:
     parts: list[str] = []
     for i, doc in enumerate(docs, 1):
         meta = doc.metadata
-        source = meta.get("source", "unknown")
-        page = meta.get("page")
-        loc = f" 第{page + 1}页" if isinstance(page, int) else ""
+        source = meta.get("file_name") or meta.get("rel_path") or meta.get("source", "unknown")
+        ver = meta.get("version")
+        loc = f" v{ver}" if ver else ""
         parts.append(f"[{i}] ({source}{loc})\n{doc.page_content}")
     return "\n\n".join(parts)
 
@@ -79,5 +79,15 @@ def get_rag_app():
 def ask(question: str) -> dict:
     """执行一次 RAG 问答，返回答案与来源。"""
     result = get_rag_app().invoke({"question": question})
-    sources = sorted({str(d.metadata.get("source", "unknown")) for d in result["context"]})
+    sources = sorted(
+        {
+            "{}{}".format(
+                d.metadata.get("file_name")
+                or d.metadata.get("rel_path")
+                or d.metadata.get("source", "unknown"),
+                f" v{d.metadata['version']}" if d.metadata.get("version") else "",
+            )
+            for d in result["context"]
+        }
+    )
     return {"question": question, "answer": result["answer"], "sources": sources}
