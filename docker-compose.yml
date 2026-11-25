@@ -1,0 +1,22 @@
+# pgvector on PostgreSQL 16
+# 数据目录持久化映射到 /Users/alex/Documents/DockerVolumes/rag-test-pg
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: rag-test-pg
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rag123456}
+      POSTGRES_DB: ${POSTGRES_DB:-ragdb}
+      # 用子目录做 PGDATA，避免挂载根目录被 initdb 改动
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - /Users/alex/Documents/DockerVolumes/rag-test-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag} -d ${POSTGRES_DB:-ragdb}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
